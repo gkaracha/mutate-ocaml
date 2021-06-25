@@ -1,0 +1,45 @@
+{
+    "gitignore.nix": {
+        "branch": "master",
+        "description": "Nix function for filtering local git sources",
+        "homepage": "",
+        "owner": "hercules-ci",
+        "repo": "gitignore.nix",
+        "rev": "211907489e9f198594c0eb0ca9256a1949c9d412",
+        "sha256": "06j7wpvj54khw0z10fjyi31kpafkr6hi1k0di13k1xp8kywvfyx8",
+        "type": "tarball",
+        "url": "https://github.com/hercules-ci/gitignore.nix/archive/211907489e9f198594c0eb0ca9256a1949c9d412.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "ligo-artifacts": {
+        "rev": "8dd8a5e662a02b13e3d3248bc618448cd9ea9fcd",
+        "sha256": "1l0kgk3v4hn0m0mgh9bf7xy3wszh1nb0syvn30iwifnskarwvibj",
+        "type": "file",
+        "url": "https://gitlab.com/ligolang/ligo/-/jobs/artifacts/8dd8a5e662a02b13e3d3248bc618448cd9ea9fcd/download?job=docker_extract",
+        "url_template": "https://gitlab.com/ligolang/ligo/-/jobs/artifacts/<rev>/download?job=docker_extract"
+    },
+    "nixpkgs": {
+        "branch": "master",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "db966f24946928e348f2332cf96aa18febd61f1d",
+        "sha256": "14zqvhz9p56yxilyaas0s8xnk5ailvf92mxlzfwp2ickq0cf2p6q",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/db966f24946928e348f2332cf96aa18febd61f1d.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "tezos-packaging": {
+        "branch": "master",
+        "description": "Various forms of Tezos software distribution for Linux.",
+        "homepage": "",
+        "owner": "serokell",
+        "repo": "tezos-packaging",
+        "rev": "6b58d2dae45dedeed127511c73f13a5d24363d31",
+        "sha256": "1na7a2mm7prxv4yym222cn167j1lsdzcdpk011i7plkgxkaxiaj2",
+        "type": "tarball",
+        "url": "https://github.com/serokell/tezos-packaging/archive/6b58d2dae45dedeed127511c73f13a5d24363d31.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}
