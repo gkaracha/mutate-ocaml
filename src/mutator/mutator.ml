@@ -86,13 +86,24 @@ let mapper_from_rules rules =
       let rec try_sequentially rs =
         match rs with
         | [] -> default_mapper.expr mapper expr
-        | r :: rs -> (
-            match r expr with
-            | Some expr -> expr
-            | None -> try_sequentially rs
-          )
+        | r :: rs ->
+          match r expr with
+          | Some expr -> expr
+          | None -> try_sequentially rs
       in try_sequentially rules
   }
+
+let all_rules =
+  [
+    rule_true_false;
+    rule_false_true;
+    rule_and_or;
+    rule_or_and;
+  ]
+
+(*
+let () = Ast_mapper.register "ppx_test" (fun _ -> mapper_from_rules all_rules)
+*)
 
 let example = true && false && (1 = 4)
 
