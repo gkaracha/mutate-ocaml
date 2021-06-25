@@ -1,0 +1,7 @@
+(test
+ (name tests)
+ (modules
+  Tests
+ )
+ (libraries mutator core_kernel ounit2 qcheck) ;; gotta reference the public_name here.
+)

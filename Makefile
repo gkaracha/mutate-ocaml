@@ -1,9 +1,15 @@
+all: build test
 
 build:
-	ocamlopt -I +compiler-libs ocamlcommon.cmxa -o parser experiment.ml
+	dune build @install
+
+test:
+	dune runtest .
 
 clean:
-	$(RM) -r *.cmi *.cmx *.o
+	$(RM) -r _build *.cmi *.cmx *.o
 
 distclean: clean
 	$(RM) parser
+
+.PHONY: all build test clean distclean

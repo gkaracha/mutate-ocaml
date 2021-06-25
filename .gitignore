@@ -2,3 +2,4 @@
 *.cmi
 *.cmo
 *.cmx
+_build/
