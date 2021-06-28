@@ -3,6 +3,7 @@
  (public_name mutator)
  (modules
   Mutator
+  Rules
  )
  (libraries compiler-libs.common)
  (wrapped false))
