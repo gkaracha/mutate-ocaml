@@ -1,5 +1,5 @@
 (** Parse an ocaml source file. *)
-let parse_ml_file (src_file : string) : Parsetree.structure =
+let parse_ml_file (src_file: string) : Parsetree.structure =
   Pparse.parse_implementation ~tool_name:"ocamlc" src_file
 
 (** Print the AST in its raw form. *)
@@ -9,6 +9,12 @@ let print_raw_ast (ast: Parsetree.structure) : unit =
 (** Pretty-print the AST (parseable ocaml). *)
 let print_ast (ast: Parsetree.structure) : unit =
   Format.fprintf Format.std_formatter "%a@." Pprintast.structure ast
+
+let reformat_ast (src_file: string) : unit =
+  let ast = parse_ml_file src_file in
+  let oc = open_out src_file in
+  let fmt = Format.formatter_of_out_channel oc in
+  Format.fprintf fmt "%a@." Pprintast.structure ast
 
 (* TODO: Should populate this from a JSON input or something. *)
 type mutation_configuration =
