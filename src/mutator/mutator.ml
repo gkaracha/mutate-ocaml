@@ -40,7 +40,8 @@ let default_configuration =
     replacement_rules = [];
   }
 
-let mapper_from_rules (rules: Rules.mutation_rule list) : Ast_mapper.mapper =
+let mapper_from_rules (rules: Rules.mutation_rule list) : (unit -> Ast_mapper.mapper) =
+  fun () ->
   Ast_mapper.{
     default_mapper with
     expr = fun mapper expr ->
@@ -54,9 +55,44 @@ let mapper_from_rules (rules: Rules.mutation_rule list) : Ast_mapper.mapper =
       in try_sequentially rules
   }
 
+let _ =
+  (* just an example to see if it works OK. I've never used monads in OCaml before. *)
+  let lst = Monad.run Monad.(
+    (from_list [1; 2; 3]) >>= fun x ->
+     return (10 * x) <|> return (10 * x + 1)
+  ) in
+  let () = List.iter (Printf.printf "%d ") lst in
+  ()
+
 (*
 let () = Ast_mapper.register "ppx_test" (fun _ -> mapper_from_rules all_rules)
 *)
+
+(* (see Ast_mapper.apply_lazy in parsing/) *)
+let apply_mapper mapper ast =
+  let open Ast_mapper in
+  let mapper = mapper () in
+  mapper.structure mapper ast
+
+
+let reformat_and_apply_rules_ast (src_file: string) : unit =
+  let all_rules =
+    [ Rules.rule_true_false
+    ; Rules.rule_false_true
+    ; Rules.rule_and_or
+    ; Rules.rule_or_and
+    ; Rules.rule_append_swap_args
+    ; Rules.rule_append_keep_first
+    ; Rules.rule_append_keep_second
+    ; Rules.rule_list_head
+    ; Rules.rule_list_tail
+    ] in
+  let ast = parse_ml_file src_file in
+  let ast = apply_mapper (mapper_from_rules all_rules) ast in
+  let oc = open_out src_file in
+  let fmt = Format.formatter_of_out_channel oc in
+  Format.fprintf fmt "%a@." Pprintast.structure ast
+
 
 let example = true && false && (1 = 4)
 

@@ -4,6 +4,7 @@
  (modules
   Mutator
   Rules
+  Monad
  )
  (libraries compiler-libs.common)
  (wrapped false))
