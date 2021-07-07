@@ -5,6 +5,7 @@
   Mutator
   Rules
   Monad
+  Ast_monadic_mapper
  )
  (libraries compiler-libs.common)
  (wrapped false))
