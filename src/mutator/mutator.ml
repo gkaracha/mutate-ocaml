@@ -74,6 +74,11 @@ let apply_mapper mapper ast =
   let mapper = mapper () in
   mapper.structure mapper ast
 
+let apply_monadic_mapper (mapper: unit -> Ast_monadic_mapper.mapper) (ast : Parsetree.structure) : int =
+  let mapper : Ast_monadic_mapper.mapper = mapper () in
+  let mresult : Parsetree.structure Monad.t = mapper.structure mapper ast in
+  let result : Parsetree.structure list = Monad.run mresult in
+  List.length result
 
 let reformat_and_apply_rules_ast (src_file: string) : unit =
   let all_rules =
@@ -87,12 +92,13 @@ let reformat_and_apply_rules_ast (src_file: string) : unit =
     ; Rules.rule_list_head
     ; Rules.rule_list_tail
     ] in
-  let ast = parse_ml_file src_file in
-  let ast = apply_mapper (mapper_from_rules all_rules) ast in
+  let in_ast = parse_ml_file src_file in
+  let n_mutants = apply_monadic_mapper (fun () -> Ast_monadic_mapper.default_mapper) in_ast in
+  print_string ("\n" ^ "Number of mutants from the default mapper (should be 1): " ^ string_of_int n_mutants ^ "\n");
+  let out_ast = apply_mapper (mapper_from_rules all_rules) in_ast in
   let oc = open_out src_file in
   let fmt = Format.formatter_of_out_channel oc in
-  Format.fprintf fmt "%a@." Pprintast.structure ast
-
+  Format.fprintf fmt "%a@." Pprintast.structure out_ast
 
 let example = true && false && (1 = 4)
 
