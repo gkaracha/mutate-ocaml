@@ -593,57 +593,112 @@ module MT = struct
     Sequence.(loc_mutants $$ desc_mutants)
 end
 
-(* FIXME:
 module M = struct
   (* Value expressions for the module language *)
 
-  let map sub {pmod_loc = loc; pmod_desc = desc; pmod_attributes = attrs} =
-    let open Mod in
-    let open Monad in
-    sub.location sub loc     >>= fun loc ->
-    sub.attributes sub attrs >>= fun attrs ->
-    match desc with
-    | Pmod_ident x -> ident ~loc ~attrs <$> (map_loc sub x)
-    | Pmod_structure str -> structure ~loc ~attrs <$> (sub.structure sub str)
-    | Pmod_functor (param, body) ->
-        functor_ ~loc ~attrs
-          <$> (map_functor_param sub param)
-          <*> (sub.module_expr sub body)
-    | Pmod_apply (m1, m2) ->
-        apply ~loc ~attrs <$> (sub.module_expr sub m1) <*> (sub.module_expr sub m2)
-    | Pmod_constraint (m, mty) ->
-        constraint_ ~loc ~attrs
-          <$> (sub.module_expr sub m)
-          <*> (sub.module_type sub mty)
-    | Pmod_unpack e -> unpack ~loc ~attrs <$> (sub.expr sub e)
-    | Pmod_extension x -> extension ~loc ~attrs <$> (sub.extension sub x)
+  let map sub {pmod_loc; pmod_desc; pmod_attributes} =
+    let loc_mutants =
+      Sequence.fmap
+        (fun pmod_loc -> {pmod_loc; pmod_desc; pmod_attributes})
+        (sub.location sub pmod_loc) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun pmod_attributes -> {pmod_loc; pmod_desc; pmod_attributes})
+        (sub.attributes sub pmod_attributes) in
+    let desc_mutants =
+      match pmod_desc with
+      | Pmod_ident x ->
+          Sequence.fmap
+            (fun x -> Mod.ident ~loc:pmod_loc ~attrs:pmod_attributes x)
+            (map_loc sub x)
+      | Pmod_structure str ->
+          Sequence.fmap
+            (fun str -> Mod.structure ~loc:pmod_loc ~attrs:pmod_attributes str)
+            (sub.structure sub str)
+      | Pmod_functor (param, body) ->
+          let param_mutants =
+            Sequence.fmap
+              (fun param -> Mod.functor_ ~loc:pmod_loc ~attrs:pmod_attributes param body)
+              (map_functor_param sub param) in
+          let body_mutants =
+            Sequence.fmap
+              (fun body -> Mod.functor_ ~loc:pmod_loc ~attrs:pmod_attributes param body)
+              (sub.module_expr sub body) in
+          Sequence.(param_mutants $$ body_mutants)
+      | Pmod_apply (m1, m2) ->
+          let m1_mutants =
+            Sequence.fmap
+              (fun m1 -> Mod.apply ~loc:pmod_loc ~attrs:pmod_attributes m1 m2)
+              (sub.module_expr sub m1) in
+          let m2_mutants =
+            Sequence.fmap
+              (fun m2 -> Mod.apply ~loc:pmod_loc ~attrs:pmod_attributes m1 m2)
+              (sub.module_expr sub m2) in
+          Sequence.(m1_mutants $$ m2_mutants)
+      | Pmod_constraint (m, mty) ->
+          let m_mutants =
+            Sequence.fmap
+              (fun m -> Mod.constraint_ ~loc:pmod_loc ~attrs:pmod_attributes m mty)
+              (sub.module_expr sub m) in
+          let mty_mutants =
+            Sequence.fmap
+              (fun mty -> Mod.constraint_ ~loc:pmod_loc ~attrs:pmod_attributes m mty)
+              (sub.module_type sub mty) in
+          Sequence.(m_mutants $$ mty_mutants)
+      | Pmod_unpack e ->
+          Sequence.fmap (fun e -> Mod.unpack ~loc:pmod_loc ~attrs:pmod_attributes e) (sub.expr sub e)
+      | Pmod_extension x ->
+          Sequence.fmap (fun x -> Mod.extension ~loc:pmod_loc ~attrs:pmod_attributes x) (sub.extension sub x)
+  in
+  Sequence.(loc_mutants $$ attrs_mutants $$ desc_mutants)
 
-  let map_structure_item sub {pstr_loc = loc; pstr_desc = desc} =
-    let open Str in
-    let open Monad in
-    sub.location sub loc >>= fun loc ->
-    match desc with
-    | Pstr_eval (x, attrs) ->
-        sub.attributes sub attrs >>= fun attrs ->
-        eval ~loc ~attrs <$> (sub.expr sub x)
-    | Pstr_value (r, vbs) -> value ~loc r <$> (mmap (sub.value_binding sub) vbs)
-    | Pstr_primitive vd -> primitive ~loc <$> (sub.value_description sub vd)
-    | Pstr_type (rf, l) -> type_ ~loc rf <$> (mmap (sub.type_declaration sub) l)
-    | Pstr_typext te -> type_extension ~loc <$> (sub.type_extension sub te)
-    | Pstr_exception ed -> exception_ ~loc <$> (sub.type_exception sub ed)
-    | Pstr_module x -> module_ ~loc <$> (sub.module_binding sub x)
-    | Pstr_recmodule l -> rec_module ~loc <$> (mmap (sub.module_binding sub) l)
-    | Pstr_modtype x -> modtype ~loc <$> (sub.module_type_declaration sub x)
-    | Pstr_open x -> open_ ~loc <$> (sub.open_declaration sub x)
-    | Pstr_class l -> class_ ~loc <$> (mmap (sub.class_declaration sub) l)
-    | Pstr_class_type l -> class_type ~loc <$> (mmap (sub.class_type_declaration sub) l)
-    | Pstr_include x -> include_ ~loc <$> (sub.include_declaration sub x)
-    | Pstr_extension (x, attrs) ->
-        sub.attributes sub attrs >>= fun attrs ->
-        extension ~loc ~attrs <$> (sub.extension sub x)
-    | Pstr_attribute x -> attribute ~loc <$> (sub.attribute sub x)
+  let map_structure_item sub {pstr_loc; pstr_desc} =
+    (* let open Str in *)
+    let loc_mutants =
+      Sequence.fmap
+        (fun pstr_loc -> {pstr_loc; pstr_desc})
+        (sub.location sub pstr_loc) in
+    let desc_mutants =
+      match pstr_desc with
+      | Pstr_eval (x, attrs) ->
+          let attrs_mutants = Sequence.fmap (fun attrs -> Str.eval ~loc:pstr_loc ~attrs x) (sub.attributes sub attrs) in
+          let x_mutants = Sequence.fmap (fun x -> Str.eval ~loc:pstr_loc ~attrs x) (sub.expr sub x) in
+          Sequence.(attrs_mutants $$ x_mutants)
+      | Pstr_value (r, vbs) ->
+          Sequence.fmap (fun vbs -> Str.value ~loc:pstr_loc r vbs) (map_list (sub.value_binding sub) vbs)
+      | Pstr_primitive vd ->
+          Sequence.fmap (fun vd -> Str.primitive ~loc:pstr_loc vd) (sub.value_description sub vd)
+      | Pstr_type (rf, l) ->
+          Sequence.fmap (fun l -> Str.type_ ~loc:pstr_loc rf l) (map_list (sub.type_declaration sub) l)
+      | Pstr_typext te ->
+          Sequence.fmap (fun te -> Str.type_extension ~loc:pstr_loc te) (sub.type_extension sub te)
+      | Pstr_exception ed ->
+          Sequence.fmap (fun ed -> Str.exception_ ~loc:pstr_loc ed) (sub.type_exception sub ed)
+      | Pstr_module x ->
+          Sequence.fmap (fun x -> Str.module_ ~loc:pstr_loc x) (sub.module_binding sub x)
+      | Pstr_recmodule l ->
+          Sequence.fmap (fun l -> Str.rec_module ~loc:pstr_loc l) (map_list (sub.module_binding sub) l)
+      | Pstr_modtype x ->
+          Sequence.fmap (fun x -> Str.modtype ~loc:pstr_loc x) (sub.module_type_declaration sub x)
+      | Pstr_open x ->
+          Sequence.fmap (fun x -> Str.open_ ~loc:pstr_loc x) (sub.open_declaration sub x)
+      | Pstr_class l ->
+          Sequence.fmap (fun l -> Str.class_ ~loc:pstr_loc l) (map_list (sub.class_declaration sub) l)
+      | Pstr_class_type l ->
+          Sequence.fmap (fun l -> Str.class_type ~loc:pstr_loc l) (map_list (sub.class_type_declaration sub) l)
+      | Pstr_include x ->
+          Sequence.fmap (fun x -> Str.include_ ~loc:pstr_loc x) (sub.include_declaration sub x)
+      | Pstr_extension (x, attrs) ->
+          let x_mutants = Sequence.fmap (fun x -> Str.extension ~loc:pstr_loc ~attrs x) (sub.extension sub x) in
+          let attrs_mutants = Sequence.fmap (fun attrs -> Str.extension ~loc:pstr_loc ~attrs x) (sub.attributes sub attrs) in
+          Sequence.(x_mutants $$ attrs_mutants)
+      | Pstr_attribute x ->
+          Sequence.fmap (fun x -> Str.attribute ~loc:pstr_loc x) (sub.attribute sub x)
+    in
+    Sequence.(loc_mutants $$ desc_mutants)
 end
 
+(* FIXME:
 module E = struct
   (* Value expressions for the core language *)
 
