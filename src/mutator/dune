@@ -4,6 +4,7 @@
  (modules
   Mutator
   Rules
+  Sequence
   Monad
   Ast_monadic_mapper
  )
