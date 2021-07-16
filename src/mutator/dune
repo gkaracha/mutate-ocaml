@@ -5,6 +5,7 @@
   Mutator
   Rules
   Sequence
+  Generate
   Monad
   Ast_monadic_mapper
  )
