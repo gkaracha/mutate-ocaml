@@ -199,53 +199,70 @@ module T = struct
     in
     Sequence.(loc_mutants $$ attr_mutants $$ desc_mutants)
 
-(*
   let map_type_declaration sub
-      {ptype_name; ptype_params; ptype_cstrs;
+      {ptype_name;
+       ptype_params;
+       ptype_cstrs;
        ptype_kind;
        ptype_private;
        ptype_manifest;
        ptype_attributes;
        ptype_loc} =
-    let open Monad in
-    sub.location sub ptype_loc                >>= fun loc ->
-    sub.attributes sub ptype_attributes       >>= fun attrs ->
-    map_loc sub ptype_name                    >>= fun ptype_name ->
-    mmap (map_fst (sub.typ sub)) ptype_params >>= fun ptype_params ->
-    mmap (map_tuple3 (sub.typ sub) (sub.typ sub) (sub.location sub)) ptype_cstrs >>= fun ptype_cstrs ->
-    sub.type_kind sub ptype_kind              >>= fun ptype_kind ->
-    map_opt (sub.typ sub) ptype_manifest      >>= fun ptype_manifest ->
-    return (
-      Type.mk ~loc ~attrs ptype_name
-        ~params:ptype_params
-        ~priv:ptype_private
-        ~cstrs:ptype_cstrs
-        ~kind:ptype_kind
-        ?manifest:ptype_manifest
+    let name_mutants =
+      Sequence.fmap
+        (fun ptype_name -> Type.mk ~loc:ptype_loc ~attrs:ptype_attributes ptype_name ~params:ptype_params ~priv:ptype_private ~cstrs:ptype_cstrs ~kind:ptype_kind ?manifest:ptype_manifest)
+        (map_loc sub ptype_name) in
+    let params_mutants =
+      Sequence.fmap
+        (fun ptype_params -> Type.mk ~loc:ptype_loc ~attrs:ptype_attributes ptype_name ~params:ptype_params ~priv:ptype_private ~cstrs:ptype_cstrs ~kind:ptype_kind ?manifest:ptype_manifest)
+        (map_list (map_fst (sub.typ sub)) ptype_params) in
+    let cstrs_mutants =
+      Sequence.fmap
+        (fun ptype_cstrs -> Type.mk ~loc:ptype_loc ~attrs:ptype_attributes ptype_name ~params:ptype_params ~priv:ptype_private ~cstrs:ptype_cstrs ~kind:ptype_kind ?manifest:ptype_manifest)
+        (map_list (map_tuple3 (sub.typ sub) (sub.typ sub) (sub.location sub)) ptype_cstrs) in
+    let kind_mutants =
+      Sequence.fmap
+        (fun ptype_kind -> Type.mk ~loc:ptype_loc ~attrs:ptype_attributes ptype_name ~params:ptype_params ~priv:ptype_private ~cstrs:ptype_cstrs ~kind:ptype_kind ?manifest:ptype_manifest)
+        (sub.type_kind sub ptype_kind) in
+    let manifest_mutants =
+      Sequence.fmap
+        (fun ptype_manifest -> Type.mk ~loc:ptype_loc ~attrs:ptype_attributes ptype_name ~params:ptype_params ~priv:ptype_private ~cstrs:ptype_cstrs ~kind:ptype_kind ?manifest:ptype_manifest)
+        (map_opt (sub.typ sub) ptype_manifest) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun ptype_attributes -> Type.mk ~loc:ptype_loc ~attrs:ptype_attributes ptype_name ~params:ptype_params ~priv:ptype_private ~cstrs:ptype_cstrs ~kind:ptype_kind ?manifest:ptype_manifest)
+        (sub.attributes sub ptype_attributes) in
+    let loc_mutants =
+      Sequence.fmap
+        (fun ptype_loc -> Type.mk ~loc:ptype_loc ~attrs:ptype_attributes ptype_name ~params:ptype_params ~priv:ptype_private ~cstrs:ptype_cstrs ~kind:ptype_kind ?manifest:ptype_manifest)
+        (sub.location sub ptype_loc) in
+    Sequence.(
+         name_mutants
+      $$ params_mutants
+      $$ cstrs_mutants
+      $$ kind_mutants
+      $$ manifest_mutants
+      $$ attrs_mutants
+      $$ loc_mutants
     )
 
-  let map_type_kind sub =
-    let open Monad in
-    function
-    | Ptype_abstract -> return Ptype_abstract
+  let map_type_kind sub = function
+    | Ptype_abstract ->
+        Sequence.empty
     | Ptype_variant l ->
-        mmap (sub.constructor_declaration sub) l >>= fun l ->
-        return (Ptype_variant l)
+        Sequence.fmap (fun l -> Ptype_variant l) (map_list (sub.constructor_declaration sub) l)
     | Ptype_record l ->
-        mmap (sub.label_declaration sub) l >>= fun l ->
-        return (Ptype_record l)
-    | Ptype_open -> return Ptype_open
+        Sequence.fmap (fun l -> Ptype_record l) (map_list (sub.label_declaration sub) l)
+    | Ptype_open ->
+        Sequence.empty
 
-  let map_constructor_arguments sub =
-    let open Monad in
-    function
+  let map_constructor_arguments sub = function
     | Pcstr_tuple l ->
-      mmap (sub.typ sub) l >>= fun l ->
-      return (Pcstr_tuple l)
+        Sequence.fmap (fun l -> Pcstr_tuple l) (map_list (sub.typ sub) l)
     | Pcstr_record l ->
-        mmap (sub.label_declaration sub) l >>= fun l ->
-        return (Pcstr_record l)
+        Sequence.fmap (fun l -> Pcstr_record l) (map_list (sub.label_declaration sub) l)
 
+(* FIXME:
   let map_type_extension sub
       {ptyext_path; ptyext_params;
        ptyext_constructors;
@@ -265,158 +282,318 @@ module T = struct
         ~params:ptyext_params
         ~priv:ptyext_private
     )
+*)
 
   let map_type_exception sub
-      {ptyexn_constructor; ptyexn_loc; ptyexn_attributes} =
-    let open Monad in
-    sub.location sub ptyexn_loc                      >>= fun loc ->
-    sub.attributes sub ptyexn_attributes             >>= fun attrs ->
-    sub.extension_constructor sub ptyexn_constructor >>= fun ptyexn_constructor ->
-    return (Te.mk_exception ~loc ~attrs ptyexn_constructor)
+      {ptyexn_constructor;
+       ptyexn_loc;
+       ptyexn_attributes} =
+    let loc_mutants =
+      Sequence.fmap
+        (fun ptyexn_loc -> Te.mk_exception ~loc:ptyexn_loc ~attrs:ptyexn_attributes ptyexn_constructor)
+        (sub.location sub ptyexn_loc) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun ptyexn_attributes -> Te.mk_exception ~loc:ptyexn_loc ~attrs:ptyexn_attributes ptyexn_constructor)
+        (sub.attributes sub ptyexn_attributes) in
+    let constructor_mutants =
+      Sequence.fmap
+        (fun ptyexn_constructor -> Te.mk_exception ~loc:ptyexn_loc ~attrs:ptyexn_attributes ptyexn_constructor)
+        (sub.extension_constructor sub ptyexn_constructor) in
+    Sequence.(loc_mutants $$ attrs_mutants $$ constructor_mutants)
 
-  let map_extension_constructor_kind sub =
-    let open Monad in
-    function
-    | Pext_decl(ctl, cto) ->
-      map_constructor_arguments sub ctl >>= fun ctl ->
-      map_opt (sub.typ sub) cto         >>= fun cto ->
-      return (Pext_decl (ctl, cto))
+  let map_extension_constructor_kind sub = function
+    | Pext_decl (ctl, cto) ->
+        let ctl_mutants = Sequence.fmap (fun ctl -> Pext_decl (ctl, cto)) (map_constructor_arguments sub ctl) in
+        let cto_mutants = Sequence.fmap (fun cto -> Pext_decl (ctl, cto)) (map_opt (sub.typ sub) cto) in
+        Sequence.(ctl_mutants $$ cto_mutants)
     | Pext_rebind li ->
-      map_loc sub li >>= fun li ->
-      return (Pext_rebind li)
+        Sequence.fmap (fun li -> Pext_rebind li) (map_loc sub li)
 
   let map_extension_constructor sub
       {pext_name;
        pext_kind;
        pext_loc;
        pext_attributes} =
-    let open Monad in
-    sub.location sub pext_loc          >>= fun loc ->
-    sub.attributes sub pext_attributes >>= fun attrs ->
-    Te.constructor ~loc ~attrs
-      <$> (map_loc sub pext_name)
-      <*> (map_extension_constructor_kind sub pext_kind)
-*)
+    let loc_mutants =
+      Sequence.fmap
+        (fun pext_loc -> Te.constructor ~loc:pext_loc ~attrs:pext_attributes pext_name pext_kind)
+        (sub.location sub pext_loc) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun pext_attributes -> Te.constructor ~loc:pext_loc ~attrs:pext_attributes pext_name pext_kind)
+        (sub.attributes sub pext_attributes) in
+    let name_mutants =
+      Sequence.fmap
+        (fun pext_name -> Te.constructor ~loc:pext_loc ~attrs:pext_attributes pext_name pext_kind)
+        (map_loc sub pext_name) in
+    let kind_mutants =
+      Sequence.fmap
+        (fun pext_kind -> Te.constructor ~loc:pext_loc ~attrs:pext_attributes pext_name pext_kind)
+        (map_extension_constructor_kind sub pext_kind) in
+    Sequence.(
+         loc_mutants
+      $$ attrs_mutants
+      $$ name_mutants
+      $$ kind_mutants
+    )
 end
 
-(*
 module CT = struct
   (* Type expressions for the class language *)
 
-  let map sub {pcty_loc = loc; pcty_desc = desc; pcty_attributes = attrs} =
-    let open Cty in
-    let open Monad in
-    sub.location sub loc     >>= fun loc ->
-    sub.attributes sub attrs >>= fun attrs ->
-    match desc with
-    | Pcty_constr (lid, tys) ->
-        constr ~loc ~attrs <$> (map_loc sub lid) <*> (mmap (sub.typ sub) tys)
-    | Pcty_signature x -> signature ~loc ~attrs <$> (sub.class_signature sub x)
-    | Pcty_arrow (lab, t, ct) ->
-        arrow ~loc ~attrs lab <$> (sub.typ sub t) <*> (sub.class_type sub ct)
-    | Pcty_extension x -> extension ~loc ~attrs <$> (sub.extension sub x)
-    | Pcty_open (o, ct) ->
-        open_ ~loc ~attrs <$> (sub.open_description sub o) <*> (sub.class_type sub ct)
+  let map sub
+      {pcty_loc;
+       pcty_desc;
+       pcty_attributes} =
+    let loc_mutants =
+      Sequence.fmap
+        (fun pcty_loc -> {pcty_loc; pcty_desc; pcty_attributes})
+        (sub.location sub pcty_loc) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun pcty_attributes -> {pcty_loc; pcty_desc; pcty_attributes})
+        (sub.attributes sub pcty_attributes) in
+    let desc_mutants =
+      match pcty_desc with
+      | Pcty_constr (lid, tys) ->
+          let lid_mutants =
+            Sequence.fmap
+              (fun lid -> Cty.constr ~loc:pcty_loc ~attrs:pcty_attributes lid tys)
+              (map_loc sub lid) in
+          let tys_mutants =
+            Sequence.fmap
+              (fun tys -> Cty.constr ~loc:pcty_loc ~attrs:pcty_attributes lid tys)
+              (map_list (sub.typ sub) tys) in
+          Sequence.(lid_mutants $$ tys_mutants)
+      | Pcty_signature x ->
+          Sequence.fmap
+            (fun x -> Cty.signature ~loc:pcty_loc ~attrs:pcty_attributes x)
+            (sub.class_signature sub x)
+      | Pcty_arrow (lab, t, ct) ->
+          let t_mutants =
+            Sequence.fmap
+              (fun t -> Cty.arrow ~loc:pcty_loc ~attrs:pcty_attributes lab t ct)
+              (sub.typ sub t) in
+          let ct_mutants =
+            Sequence.fmap
+              (fun ct -> Cty.arrow ~loc:pcty_loc ~attrs:pcty_attributes lab t ct)
+              (sub.class_type sub ct) in
+          Sequence.(t_mutants $$ ct_mutants)
+      | Pcty_extension x ->
+          Sequence.fmap
+            (fun x -> Cty.extension ~loc:pcty_loc ~attrs:pcty_attributes x)
+            (sub.extension sub x)
+      | Pcty_open (o, ct) ->
+          let o_mutants =
+            Sequence.fmap
+              (fun o -> Cty.open_ ~loc:pcty_loc ~attrs:pcty_attributes o ct)
+              (sub.open_description sub o) in
+          let ct_mutants =
+            Sequence.fmap
+              (fun ct -> Cty.open_ ~loc:pcty_loc ~attrs:pcty_attributes o ct)
+              (sub.class_type sub ct) in
+          Sequence.(o_mutants $$ ct_mutants)
+    in
+    Sequence.(loc_mutants $$ attrs_mutants $$ desc_mutants)
 
-  let map_field sub {pctf_desc = desc; pctf_loc = loc; pctf_attributes = attrs} =
-    let open Ctf in
-    let open Monad in
-    sub.location sub loc     >>= fun loc ->
-    sub.attributes sub attrs >>= fun attrs ->
-    match desc with
-    | Pctf_inherit ct -> inherit_ ~loc ~attrs <$> (sub.class_type sub ct)
-    | Pctf_val (s, m, v, t) ->
-        val_ ~loc ~attrs <$> (map_loc sub s) <*> (return m) <*> (return v) <*> (sub.typ sub t)
-    | Pctf_method (s, p, v, t) ->
-        method_ ~loc ~attrs <$> (map_loc sub s) <*> (return p) <*> (return v) <*> (sub.typ sub t)
-    | Pctf_constraint (t1, t2) ->
-        constraint_ ~loc ~attrs <$> (sub.typ sub t1) <*> (sub.typ sub t2)
-    | Pctf_attribute x -> attribute ~loc <$> (sub.attribute sub x)
-    | Pctf_extension x -> extension ~loc ~attrs <$> (sub.extension sub x)
+  let map_field sub
+      {pctf_desc;
+       pctf_loc;
+       pctf_attributes} =
+    let loc_mutants =
+      Sequence.fmap
+        (fun pctf_loc -> {pctf_desc; pctf_loc; pctf_attributes})
+        (sub.location sub pctf_loc) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun pctf_attributes -> {pctf_desc; pctf_loc; pctf_attributes})
+        (sub.attributes sub pctf_attributes) in
+    let desc_mutants =
+      match pctf_desc with
+      | Pctf_inherit ct ->
+          Sequence.fmap
+            (fun ct -> Ctf.inherit_ ~loc:pctf_loc ~attrs:pctf_attributes ct)
+            (sub.class_type sub ct)
+      | Pctf_val (s, m, v, t) ->
+          let s_mutants =
+            Sequence.fmap
+              (fun s -> Ctf.val_ ~loc:pctf_loc ~attrs:pctf_attributes s m v t)
+              (map_loc sub s) in
+          let t_mutants =
+            Sequence.fmap
+              (fun t -> Ctf.val_ ~loc:pctf_loc ~attrs:pctf_attributes s m v t)
+              (sub.typ sub t) in
+          Sequence.(s_mutants $$ t_mutants)
+      | Pctf_method (s, p, v, t) ->
+          let s_mutants =
+            Sequence.fmap
+              (fun s -> Ctf.method_ ~loc:pctf_loc ~attrs:pctf_attributes s p v t)
+              (map_loc sub s) in
+          let t_mutants =
+            Sequence.fmap
+              (fun t -> Ctf.method_ ~loc:pctf_loc ~attrs:pctf_attributes s p v t)
+              (sub.typ sub t) in
+          Sequence.(s_mutants $$ t_mutants)
+      | Pctf_constraint (t1, t2) ->
+          let t1_mutants =
+            Sequence.fmap
+              (fun t1 -> Ctf.constraint_ ~loc:pctf_loc ~attrs:pctf_attributes t1 t2)
+              (sub.typ sub t1) in
+          let t2_mutants =
+            Sequence.fmap
+              (fun t2 -> Ctf.constraint_ ~loc:pctf_loc ~attrs:pctf_attributes t1 t2)
+              (sub.typ sub t2) in
+          Sequence.(t1_mutants $$ t2_mutants)
+      | Pctf_attribute x ->
+          Sequence.fmap
+            (fun x -> Ctf.attribute ~loc:pctf_loc x)
+            (sub.attribute sub x)
+      | Pctf_extension x ->
+          Sequence.fmap
+            (fun x -> Ctf.extension ~loc:pctf_loc ~attrs:pctf_attributes x)
+            (sub.extension sub x)
+    in
+    Sequence.(loc_mutants $$ attrs_mutants $$ desc_mutants)
 
   let map_signature sub {pcsig_self; pcsig_fields} =
-    let open Monad in
-    Csig.mk
-      <$> (sub.typ sub pcsig_self)
-      <*> (mmap (sub.class_type_field sub) pcsig_fields)
+    let self_mutants =
+      Sequence.fmap
+        (fun pcsig_self -> Csig.mk pcsig_self pcsig_fields)
+        (sub.typ sub pcsig_self) in
+    let fields_mutants =
+      Sequence.fmap
+        (fun pcsig_fields -> Csig.mk pcsig_self pcsig_fields)
+        (map_list (sub.class_type_field sub) pcsig_fields) in
+    Sequence.(self_mutants $$ fields_mutants)
 end
 
-let map_functor_param sub =
-  let open Monad in
-  function
-  | Unit -> return Unit
+let map_functor_param sub = function
+  | Unit -> Sequence.empty
   | Named (s, mt) ->
-    map_loc sub s          >>= fun s ->
-    sub.module_type sub mt >>= fun mt ->
-    return (Named (s, mt))
+    let s_mutants = Sequence.fmap (fun s -> Named (s, mt)) (map_loc sub s) in
+    let mt_mutants = Sequence.fmap (fun mt -> Named (s, mt)) (sub.module_type sub mt) in
+    Sequence.(s_mutants $$ mt_mutants)
 
 module MT = struct
   (* Type expressions for the module language *)
 
-  let map sub {pmty_desc = desc; pmty_loc = loc; pmty_attributes = attrs} =
-    let open Mty in
-    let open Monad in
-    sub.location sub loc     >>= fun loc ->
-    sub.attributes sub attrs >>= fun attrs ->
-    match desc with
-    | Pmty_ident s -> ident ~loc ~attrs <$> (map_loc sub s)
-    | Pmty_alias s -> alias ~loc ~attrs <$> (map_loc sub s)
-    | Pmty_signature sg -> signature ~loc ~attrs <$> (sub.signature sub sg)
-    | Pmty_functor (param, mt) ->
-        functor_ ~loc ~attrs
-          <$> (map_functor_param sub param)
-          <*> (sub.module_type sub mt)
-    | Pmty_with (mt, l) ->
-        with_ ~loc ~attrs
-          <$> (sub.module_type sub mt)
-          <*> (mmap (sub.with_constraint sub) l)
-    | Pmty_typeof me -> typeof_ ~loc ~attrs <$> (sub.module_expr sub me)
-    | Pmty_extension x -> extension ~loc ~attrs <$> (sub.extension sub x)
+  let map sub {pmty_desc; pmty_loc; pmty_attributes} =
+    let loc_mutants =
+      Sequence.fmap
+        (fun pmty_loc -> {pmty_desc; pmty_loc; pmty_attributes})
+        (sub.location sub pmty_loc) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun pmty_attributes -> {pmty_desc; pmty_loc; pmty_attributes})
+        (sub.attributes sub pmty_attributes) in
+    let desc_mutants =
+      match pmty_desc with
+      | Pmty_ident s ->
+          Sequence.fmap
+            (fun s -> Mty.ident ~loc:pmty_loc ~attrs:pmty_attributes s)
+            (map_loc sub s)
+      | Pmty_alias s ->
+          Sequence.fmap
+            (fun s -> Mty.alias ~loc:pmty_loc ~attrs:pmty_attributes s)
+            (map_loc sub s)
+      | Pmty_signature sg ->
+          Sequence.fmap
+            (fun sg -> Mty.signature ~loc:pmty_loc ~attrs:pmty_attributes sg)
+            (sub.signature sub sg)
+      | Pmty_functor (param, mt) ->
+          let param_mutants =
+            Sequence.fmap
+              (fun param -> Mty.functor_ ~loc:pmty_loc ~attrs:pmty_attributes param mt)
+              (map_functor_param sub param) in
+          let mt_mutants =
+            Sequence.fmap
+              (fun mt -> Mty.functor_ ~loc:pmty_loc ~attrs:pmty_attributes param mt)
+              (sub.module_type sub mt) in
+          Sequence.(param_mutants $$ mt_mutants)
+      | Pmty_with (mt, l) ->
+          let mt_mutants =
+             Sequence.fmap
+               (fun mt -> Mty.with_ ~loc:pmty_loc ~attrs:pmty_attributes mt l)
+               (sub.module_type sub mt) in
+          let l_mutants =
+             Sequence.fmap
+               (fun l -> Mty.with_ ~loc:pmty_loc ~attrs:pmty_attributes mt l)
+               (map_list (sub.with_constraint sub) l) in
+          Sequence.(mt_mutants $$ l_mutants)
+      | Pmty_typeof me ->
+          Sequence.fmap
+            (fun me -> Mty.typeof_ ~loc:pmty_loc ~attrs:pmty_attributes me)
+            (sub.module_expr sub me)
+      | Pmty_extension x ->
+          Sequence.fmap
+            (fun x -> Mty.extension ~loc:pmty_loc ~attrs:pmty_attributes x)
+            (sub.extension sub x)
+    in
+    Sequence.(loc_mutants $$ attrs_mutants $$ desc_mutants)
 
-  let map_with_constraint sub =
-    let open Monad in
-    function
+  let map_with_constraint sub = function
     | Pwith_type (lid, d) ->
-        map_loc sub lid            >>= fun lid ->
-        sub.type_declaration sub d >>= fun d ->
-        return (Pwith_type (lid, d))
-    | Pwith_module (lid, lid2) ->
-        map_loc sub lid  >>= fun lid ->
-        map_loc sub lid2 >>= fun lid2 ->
-        return (Pwith_module (lid, lid2))
+        let lid_mutants = Sequence.fmap (fun lid -> Pwith_type (lid, d)) (map_loc sub lid) in
+        let d_mutants = Sequence.fmap (fun d -> Pwith_type (lid, d)) (sub.type_declaration sub d) in
+        Sequence.(lid_mutants $$ d_mutants)
+    | Pwith_module (lid1, lid2) ->
+        let lid1_mutants = Sequence.fmap (fun lid1 -> Pwith_module (lid1, lid2)) (map_loc sub lid1) in
+        let lid2_mutants = Sequence.fmap (fun lid2 -> Pwith_module (lid1, lid2)) (map_loc sub lid2) in
+        Sequence.(lid1_mutants $$ lid2_mutants)
     | Pwith_typesubst (lid, d) ->
-        map_loc sub lid            >>= fun lid ->
-        sub.type_declaration sub d >>= fun d ->
-        return (Pwith_typesubst (lid, d))
+        let lid_mutants = Sequence.fmap (fun lid -> Pwith_typesubst (lid, d)) (map_loc sub lid) in
+        let d_mutants = Sequence.fmap (fun d -> Pwith_typesubst (lid, d)) (sub.type_declaration sub d) in
+        Sequence.(lid_mutants $$ d_mutants)
     | Pwith_modsubst (s, lid) ->
-        map_loc sub s   >>= fun s ->
-        map_loc sub lid >>= fun lid ->
-        return (Pwith_modsubst (s, lid))
+        let s_mutants = Sequence.fmap (fun s -> Pwith_modsubst (s, lid)) (map_loc sub s) in
+        let lid_mutants = Sequence.fmap (fun lid -> Pwith_modsubst (s, lid)) (map_loc sub lid) in
+        Sequence.(s_mutants $$ lid_mutants)
 
-  let map_signature_item sub {psig_desc = desc; psig_loc = loc} =
-    let open Sig in
-    let open Monad in
-    sub.location sub loc >>= fun loc ->
-    match desc with
-    | Psig_value vd -> value ~loc <$> (sub.value_description sub vd)
-    | Psig_type (rf, l) -> type_ ~loc rf <$> (mmap (sub.type_declaration sub) l)
-    | Psig_typesubst l -> type_subst ~loc <$> (mmap (sub.type_declaration sub) l)
-    | Psig_typext te -> type_extension ~loc <$> (sub.type_extension sub te)
-    | Psig_exception ed -> exception_ ~loc <$> (sub.type_exception sub ed)
-    | Psig_module x -> module_ ~loc <$> (sub.module_declaration sub x)
-    | Psig_modsubst x -> mod_subst ~loc <$> (sub.module_substitution sub x)
-    | Psig_recmodule l -> rec_module ~loc <$> (mmap (sub.module_declaration sub) l)
-    | Psig_modtype x -> modtype ~loc <$> (sub.module_type_declaration sub x)
-    | Psig_open x -> open_ ~loc <$> (sub.open_description sub x)
-    | Psig_include x -> include_ ~loc <$> (sub.include_description sub x)
-    | Psig_class l -> class_ ~loc <$> (mmap (sub.class_description sub) l)
-    | Psig_class_type l -> class_type ~loc <$> (mmap (sub.class_type_declaration sub) l)
-    | Psig_extension (x, attrs) ->
-        sub.attributes sub attrs >>= fun attrs ->
-        extension ~loc ~attrs <$> (sub.extension sub x)
-    | Psig_attribute x -> attribute ~loc <$> (sub.attribute sub x)
+  let map_signature_item sub {psig_desc; psig_loc} =
+    let loc_mutants =
+      Sequence.fmap
+        (fun psig_loc -> {psig_desc; psig_loc})
+        (sub.location sub psig_loc) in
+    let desc_mutants =
+      match psig_desc with
+      | Psig_value vd ->
+          Sequence.fmap (fun vd -> Sig.value ~loc:psig_loc vd) (sub.value_description sub vd)
+      | Psig_type (rf, l) ->
+          Sequence.fmap (fun l -> Sig.type_ ~loc:psig_loc rf l) (map_list (sub.type_declaration sub) l)
+      | Psig_typesubst l ->
+          Sequence.fmap (fun l -> Sig.type_subst ~loc:psig_loc l) (map_list (sub.type_declaration sub) l)
+      | Psig_typext te ->
+          Sequence.fmap (fun te -> Sig.type_extension ~loc:psig_loc te) (sub.type_extension sub te)
+      | Psig_exception ed ->
+          Sequence.fmap (fun ed -> Sig.exception_ ~loc:psig_loc ed) (sub.type_exception sub ed)
+      | Psig_module x ->
+          Sequence.fmap (fun x -> Sig.module_ ~loc:psig_loc x) (sub.module_declaration sub x)
+      | Psig_modsubst x ->
+          Sequence.fmap (fun x -> Sig.mod_subst ~loc:psig_loc x) (sub.module_substitution sub x)
+      | Psig_recmodule l ->
+          Sequence.fmap (fun l -> Sig.rec_module ~loc:psig_loc l) (map_list (sub.module_declaration sub) l)
+      | Psig_modtype x ->
+          Sequence.fmap (fun x -> Sig.modtype ~loc:psig_loc x) (sub.module_type_declaration sub x)
+      | Psig_open x ->
+          Sequence.fmap (fun x -> Sig.open_ ~loc:psig_loc x) (sub.open_description sub x)
+      | Psig_include x ->
+          Sequence.fmap (fun x -> Sig.include_ ~loc:psig_loc x) (sub.include_description sub x)
+      | Psig_class l ->
+          Sequence.fmap (fun l -> Sig.class_ ~loc:psig_loc l) (map_list (sub.class_description sub) l)
+      | Psig_class_type l ->
+          Sequence.fmap (fun l -> Sig.class_type ~loc:psig_loc l) (map_list (sub.class_type_declaration sub) l)
+      | Psig_extension (x, attrs) ->
+          let x_mutants = Sequence.fmap (fun x -> Sig.extension ~loc:psig_loc ~attrs x) (sub.extension sub x) in
+          let attrs_mutants = Sequence.fmap (fun attrs -> Sig.extension ~loc:psig_loc ~attrs x) (sub.attributes sub attrs) in
+          Sequence.(x_mutants $$ attrs_mutants)
+      | Psig_attribute x ->
+          Sequence.fmap (fun x -> Sig.attribute ~loc:psig_loc x) (sub.attribute sub x)
+    in
+    Sequence.(loc_mutants $$ desc_mutants)
 end
 
+(* FIXME:
 module M = struct
   (* Value expressions for the module language *)
 
