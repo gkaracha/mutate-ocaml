@@ -54,8 +54,8 @@ type mapper = {
 }
 
 (* Some utilities *)
-let map_fst f (x, y) = Sequence.fmap (fun z -> (z, y)) (f x)
-let map_snd f (x, y) = Sequence.fmap (fun z -> (z, y)) (f x)
+let map_fst f (x, y) = Sequence.fmap (fun x -> (x, y)) (f x)
+let map_snd f (x, y) = Sequence.fmap (fun y -> (x, y)) (f y)
 
 let map_tuple f1 f2 (x, y) =
   let x_mutants = Sequence.fmap (fun x -> (x, y)) (f1 x) in
@@ -698,102 +698,146 @@ module M = struct
     Sequence.(loc_mutants $$ desc_mutants)
 end
 
-(* FIXME:
 module E = struct
   (* Value expressions for the core language *)
 
-  let map sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs; pexp_loc_stack = _} =
-    let open Exp in
-    let open Monad in
-    sub.location sub loc     >>= fun loc ->
-    sub.attributes sub attrs >>= fun attrs ->
-    match desc with
-    | Pexp_ident x -> ident ~loc ~attrs <$> (map_loc sub x)
-    | Pexp_constant x -> constant ~loc ~attrs <$> (sub.constant sub x)
-    | Pexp_let (r, vbs, e) ->
-        let_ ~loc ~attrs r
-          <$> (mmap (sub.value_binding sub) vbs)
-          <*> (sub.expr sub e)
-    | Pexp_fun (lab, def, p, e) ->
-        fun_ ~loc ~attrs lab
-          <$> (map_opt (sub.expr sub) def)
-          <*> (sub.pat sub p)
-          <*> (sub.expr sub e)
-    | Pexp_function pel -> function_ ~loc ~attrs <$> (sub.cases sub pel)
-    | Pexp_apply (e, l) -> apply ~loc ~attrs <$> (sub.expr sub e) <*> (mmap (map_snd (sub.expr sub)) l)
-    | Pexp_match (e, pel) -> match_ ~loc ~attrs <$> (sub.expr sub e) <*> (sub.cases sub pel)
-    | Pexp_try (e, pel) -> try_ ~loc ~attrs <$> (sub.expr sub e) <*> (sub.cases sub pel)
-    | Pexp_tuple el -> tuple ~loc ~attrs <$> (mmap (sub.expr sub) el)
-    | Pexp_construct (lid, arg) -> construct ~loc ~attrs <$> (map_loc sub lid) <*> (map_opt (sub.expr sub) arg)
-    | Pexp_variant (lab, eo) -> variant ~loc ~attrs lab <$> (map_opt (sub.expr sub) eo)
-    | Pexp_record (l, eo) ->
-        record ~loc ~attrs
-          <$> (mmap (map_tuple (map_loc sub) (sub.expr sub)) l)
-          <*> (map_opt (sub.expr sub) eo)
-    | Pexp_field (e, lid) -> field ~loc ~attrs <$> (sub.expr sub e) <*> (map_loc sub lid)
-    | Pexp_setfield (e1, lid, e2) ->
-        setfield ~loc ~attrs
-          <$> (sub.expr sub e1)
-          <*> (map_loc sub lid)
-          <*> (sub.expr sub e2)
-    | Pexp_array el -> array ~loc ~attrs <$> (mmap (sub.expr sub) el)
-    | Pexp_ifthenelse (e1, e2, e3) ->
-        ifthenelse ~loc ~attrs
-          <$> (sub.expr sub e1)
-          <*> (sub.expr sub e2)
-          <*> (map_opt (sub.expr sub) e3)
-    | Pexp_sequence (e1, e2) ->
-        sequence ~loc ~attrs <$> (sub.expr sub e1) <*> (sub.expr sub e2)
-    | Pexp_while (e1, e2) ->
-        while_ ~loc ~attrs <$> (sub.expr sub e1) <*> (sub.expr sub e2)
-    | Pexp_for (p, e1, e2, d, e3) ->
-        for_ ~loc ~attrs
-          <$> (sub.pat sub p)
-          <*> (sub.expr sub e1)
-          <*> (sub.expr sub e2)
-          <*> (return d)
-          <*> (sub.expr sub e3)
-    | Pexp_coerce (e, t1, t2) ->
-        coerce ~loc ~attrs
-          <$> (sub.expr sub e)
-          <*> (map_opt (sub.typ sub) t1)
-          <*> (sub.typ sub t2)
-    | Pexp_constraint (e, t) ->
-        constraint_ ~loc ~attrs <$> (sub.expr sub e) <*> (sub.typ sub t)
-    | Pexp_send (e, s) ->
-        send ~loc ~attrs <$> (sub.expr sub e) <*> (map_loc sub s)
-    | Pexp_new lid -> new_ ~loc ~attrs <$> (map_loc sub lid)
-    | Pexp_setinstvar (s, e) ->
-        setinstvar ~loc ~attrs <$> (map_loc sub s) <*> (sub.expr sub e)
-    | Pexp_override sel ->
-        override ~loc ~attrs <$> (mmap (map_tuple (map_loc sub) (sub.expr sub)) sel)
-    | Pexp_letmodule (s, me, e) ->
-        letmodule ~loc ~attrs
-          <$> (map_loc sub s)
-          <*> (sub.module_expr sub me)
-          <*> (sub.expr sub e)
-    | Pexp_letexception (cd, e) ->
-        letexception ~loc ~attrs
-          <$> (sub.extension_constructor sub cd)
-          <*> (sub.expr sub e)
-    | Pexp_assert e -> assert_ ~loc ~attrs <$> (sub.expr sub e)
-    | Pexp_lazy e -> lazy_ ~loc ~attrs <$> (sub.expr sub e)
-    | Pexp_poly (e, t) ->
-        poly ~loc ~attrs <$> (sub.expr sub e) <*> (map_opt (sub.typ sub) t)
-    | Pexp_object cls -> object_ ~loc ~attrs <$> (sub.class_structure sub cls)
-    | Pexp_newtype (s, e) ->
-        newtype ~loc ~attrs <$> (map_loc sub s) <*> (sub.expr sub e)
-    | Pexp_pack me -> pack ~loc ~attrs <$> (sub.module_expr sub me)
-    | Pexp_open (o, e) ->
-        open_ ~loc ~attrs <$> (sub.open_declaration sub o) <*> (sub.expr sub e)
-    | Pexp_letop {let_; ands; body} ->
-        letop ~loc ~attrs
-          <$> (sub.binding_op sub let_)
-          <*> (mmap (sub.binding_op sub) ands)
-          <*> (sub.expr sub body)
-    | Pexp_extension x -> extension ~loc ~attrs <$> (sub.extension sub x)
-    | Pexp_unreachable -> return (unreachable ~loc ~attrs ())
+  let map sub {pexp_loc; pexp_desc; pexp_attributes; pexp_loc_stack} =
+    (* let open Exp in *)
+    let loc_mutants =
+      Sequence.fmap
+        (fun pexp_loc -> {pexp_loc; pexp_desc; pexp_attributes; pexp_loc_stack})
+        (sub.location sub pexp_loc) in
+    let attrs_mutants =
+      Sequence.fmap
+        (fun pexp_attributes -> {pexp_loc; pexp_desc; pexp_attributes; pexp_loc_stack})
+        (sub.attributes sub pexp_attributes) in
+    let desc_mutants =
+      match pexp_desc with
+      | Pexp_ident x ->
+          Sequence.fmap
+            (fun x -> Exp.ident ~loc:pexp_loc ~attrs:pexp_attributes x)
+            (map_loc sub x)
+      | Pexp_constant x ->
+          Sequence.fmap
+            (fun x -> Exp.constant ~loc:pexp_loc ~attrs:pexp_attributes x)
+            (sub.constant sub x)
+      | Pexp_let (r, vbs, e) ->
+          let vbs_mutants =
+            Sequence.fmap
+              (fun vbs -> Exp.let_ ~loc:pexp_loc ~attrs:pexp_attributes r vbs e)
+              (map_list (sub.value_binding sub) vbs) in
+          let e_mutants =
+            Sequence.fmap
+              (fun e -> Exp.let_ ~loc:pexp_loc ~attrs:pexp_attributes r vbs e)
+              (sub.expr sub e) in
+          Sequence.(vbs_mutants $$ e_mutants)
+      | Pexp_fun (lab, def, p, e) ->
+          let def_mutants =
+            Sequence.fmap
+              (fun def -> Exp.fun_ ~loc:pexp_loc ~attrs:pexp_attributes lab def p e)
+              (map_opt (sub.expr sub) def) in
+          let p_mutants =
+            Sequence.fmap
+              (fun p -> Exp.fun_ ~loc:pexp_loc ~attrs:pexp_attributes lab def p e)
+              (sub.pat sub p) in
+          let e_mutants =
+            Sequence.fmap
+              (fun e -> Exp.fun_ ~loc:pexp_loc ~attrs:pexp_attributes lab def p e)
+              (sub.expr sub e) in
+          Sequence.(def_mutants $$ p_mutants $$ e_mutants)
+      | Pexp_function pel ->
+          Sequence.fmap
+            (fun pel -> Exp.function_ ~loc:pexp_loc ~attrs:pexp_attributes pel)
+            (sub.cases sub pel)
+      | Pexp_apply (e, l) ->
+          let e_mutants =
+            Sequence.fmap
+              (fun e -> Exp.apply ~loc:pexp_loc ~attrs:pexp_attributes e l)
+              (sub.expr sub e) in
+          let l_mutants =
+            Sequence.fmap
+              (fun l -> Exp.apply ~loc:pexp_loc ~attrs:pexp_attributes e l)
+              (map_list (map_snd (sub.expr sub)) l) in
+          Sequence.(e_mutants $$ l_mutants)
+      (* WIP: STOPPED HERE *)
 
+      | Pexp_match (e, pel) -> match_ ~loc:pexp_loc ~attrs:pexp_attributes <$> (sub.expr sub e) <*> (sub.cases sub pel)
+      | Pexp_try (e, pel) -> try_ ~loc:pexp_loc ~attrs:pexp_attributes <$> (sub.expr sub e) <*> (sub.cases sub pel)
+      | Pexp_tuple el -> tuple ~loc:pexp_loc ~attrs:pexp_attributes <$> (mmap (sub.expr sub) el)
+      | Pexp_construct (lid, arg) -> construct ~loc:pexp_loc ~attrs:pexp_attributes <$> (map_loc sub lid) <*> (map_opt (sub.expr sub) arg)
+      | Pexp_variant (lab, eo) -> variant ~loc:pexp_loc ~attrs:pexp_attributes lab <$> (map_opt (sub.expr sub) eo)
+      | Pexp_record (l, eo) ->
+          record ~loc ~attrs
+            <$> (mmap (map_tuple (map_loc sub) (sub.expr sub)) l)
+            <*> (map_opt (sub.expr sub) eo)
+      | Pexp_field (e, lid) -> field ~loc ~attrs <$> (sub.expr sub e) <*> (map_loc sub lid)
+      | Pexp_setfield (e1, lid, e2) ->
+          setfield ~loc ~attrs
+            <$> (sub.expr sub e1)
+            <*> (map_loc sub lid)
+            <*> (sub.expr sub e2)
+      | Pexp_array el -> array ~loc ~attrs <$> (mmap (sub.expr sub) el)
+      | Pexp_ifthenelse (e1, e2, e3) ->
+          ifthenelse ~loc ~attrs
+            <$> (sub.expr sub e1)
+            <*> (sub.expr sub e2)
+            <*> (map_opt (sub.expr sub) e3)
+      | Pexp_sequence (e1, e2) ->
+          sequence ~loc ~attrs <$> (sub.expr sub e1) <*> (sub.expr sub e2)
+      | Pexp_while (e1, e2) ->
+          while_ ~loc ~attrs <$> (sub.expr sub e1) <*> (sub.expr sub e2)
+      | Pexp_for (p, e1, e2, d, e3) ->
+          for_ ~loc ~attrs
+            <$> (sub.pat sub p)
+            <*> (sub.expr sub e1)
+            <*> (sub.expr sub e2)
+            <*> (return d)
+            <*> (sub.expr sub e3)
+      | Pexp_coerce (e, t1, t2) ->
+          coerce ~loc ~attrs
+            <$> (sub.expr sub e)
+            <*> (map_opt (sub.typ sub) t1)
+            <*> (sub.typ sub t2)
+      | Pexp_constraint (e, t) ->
+          constraint_ ~loc ~attrs <$> (sub.expr sub e) <*> (sub.typ sub t)
+      | Pexp_send (e, s) ->
+          send ~loc ~attrs <$> (sub.expr sub e) <*> (map_loc sub s)
+      | Pexp_new lid -> new_ ~loc ~attrs <$> (map_loc sub lid)
+      | Pexp_setinstvar (s, e) ->
+          setinstvar ~loc ~attrs <$> (map_loc sub s) <*> (sub.expr sub e)
+      | Pexp_override sel ->
+          override ~loc ~attrs <$> (mmap (map_tuple (map_loc sub) (sub.expr sub)) sel)
+      | Pexp_letmodule (s, me, e) ->
+          letmodule ~loc ~attrs
+            <$> (map_loc sub s)
+            <*> (sub.module_expr sub me)
+            <*> (sub.expr sub e)
+      | Pexp_letexception (cd, e) ->
+          letexception ~loc ~attrs
+            <$> (sub.extension_constructor sub cd)
+            <*> (sub.expr sub e)
+      | Pexp_assert e -> assert_ ~loc ~attrs <$> (sub.expr sub e)
+      | Pexp_lazy e -> lazy_ ~loc ~attrs <$> (sub.expr sub e)
+      | Pexp_poly (e, t) ->
+          poly ~loc ~attrs <$> (sub.expr sub e) <*> (map_opt (sub.typ sub) t)
+      | Pexp_object cls -> object_ ~loc ~attrs <$> (sub.class_structure sub cls)
+      | Pexp_newtype (s, e) ->
+          newtype ~loc ~attrs <$> (map_loc sub s) <*> (sub.expr sub e)
+      | Pexp_pack me -> pack ~loc ~attrs <$> (sub.module_expr sub me)
+      | Pexp_open (o, e) ->
+          open_ ~loc ~attrs <$> (sub.open_declaration sub o) <*> (sub.expr sub e)
+      | Pexp_letop {let_; ands; body} ->
+          letop ~loc ~attrs
+            <$> (sub.binding_op sub let_)
+            <*> (mmap (sub.binding_op sub) ands)
+            <*> (sub.expr sub body)
+      | Pexp_extension x -> extension ~loc ~attrs <$> (sub.extension sub x)
+      | Pexp_unreachable -> return (unreachable ~loc ~attrs ())
+    in
+    Sequence.(loc_mutants $$ attrs_mutants $$ desc_mutants)
+
+
+(* FIXME:
   let map_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =
     let open Exp in
     let open Monad in
@@ -802,9 +846,10 @@ module E = struct
       <*> (sub.pat sub pbop_pat)
       <*> (sub.expr sub pbop_exp)
       <*> (sub.location sub pbop_loc)
-
+*)
 end
 
+(* FIXME:
 module P = struct
   (* Patterns *)
 
